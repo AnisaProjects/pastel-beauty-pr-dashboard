@@ -1,9 +1,40 @@
 {
   "name": "pastel-beauty-pr-dashboard",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Pastel Beauty PR performance dashboard (static frontend + Vercel serverless API + Postgres storage)",
+  "description": "Pastel Beauty PR performance dashboard — Next.js app with named-user login and a Postgres backend",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "seed:users": "tsx scripts/seed-users.ts",
+    "migrate:legacy:extract": "tsx scripts/extract-legacy-data.ts",
+    "migrate:legacy:data": "tsx scripts/migrate-legacy-data.ts"
+  },
   "dependencies": {
-    "@vercel/postgres": "^0.10.0"
+    "@vercel/postgres": "^0.10.0",
+    "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
+    "drizzle-orm": "^0.45.2",
+    "next": "16.3.5",
+    "next-auth": "5.0.0-beta.32",
+    "react": "19.2.8",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^18.0.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tsx": "^4.23.13",
+    "typescript": "^5"
   }
 }

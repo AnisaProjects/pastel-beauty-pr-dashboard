@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/", "destination": "/pastel_beauty_pr_dashboard.html" }
-  ]
-}
