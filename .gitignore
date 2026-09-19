@@ -6,3 +6,12 @@ node_modules
 .next
 next-env.d.ts
 *.tsbuildinfo
+.env*
+
+# Local AI-tooling artifacts (Claude Code / Vercel CLI skill caches, Next.js's
+# auto-generated agent context stub) — not app code, regenerated as needed.
+.claude
+.agents
+skills-lock.json
+AGENTS.md
+CLAUDE.md

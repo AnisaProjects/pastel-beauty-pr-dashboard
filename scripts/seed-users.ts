@@ -18,7 +18,7 @@
 // Safe to re-run: existing emails get their name/password updated (upsert),
 // nothing is duplicated. Change/rotate a password by editing the list and
 // re-running.
-import "dotenv/config";
+import "../lib/loadEnv";
 
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";

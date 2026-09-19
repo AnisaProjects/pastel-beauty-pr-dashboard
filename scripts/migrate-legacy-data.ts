@@ -27,7 +27,7 @@
 //   4. Prints a per-fiscal-year count(*) / sum(total_qty) summary so you can
 //      compare it against what the dashboard currently displays before cutting
 //      production over.
-import "dotenv/config";
+import "../lib/loadEnv";
 
 import fs from "node:fs";
 import path from "node:path";
