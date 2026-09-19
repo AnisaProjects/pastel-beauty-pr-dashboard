@@ -1,0 +1,1 @@
+ALTER TABLE "ai_reports" ADD COLUMN "report_type" text DEFAULT 'ai' NOT NULL;

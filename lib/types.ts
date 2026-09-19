@@ -54,10 +54,13 @@ export type MetaResponse = {
 // ReportAggregates from client components via this file.
 export type { ReportAggregates } from "@/lib/aggregations";
 
+export type ReportType = "ai" | "standard";
+
 export type ReportSummary = {
   id: number;
   generatedAt: string;
   generatedBy: string | null;
+  reportType: ReportType;
   model: string;
   status: string;
 };

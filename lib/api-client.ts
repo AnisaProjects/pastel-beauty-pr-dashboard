@@ -1,6 +1,6 @@
 "use client";
 
-import type { MetaResponse, PrRecord, PrRecordInput, ReportDetail, ReportSummary } from "@/lib/types";
+import type { MetaResponse, PrRecord, PrRecordInput, ReportDetail, ReportSummary, ReportType } from "@/lib/types";
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -78,9 +78,13 @@ export async function fetchReport(id: number | string): Promise<ReportDetail> {
   return report;
 }
 
-export async function generateReport(): Promise<ReportDetail> {
+export async function generateReport(type: ReportType = "ai"): Promise<ReportDetail> {
   const { report } = await handle<{ report: ReportDetail }>(
-    await fetch("/api/reports", { method: "POST" }),
+    await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    }),
   );
   return report;
 }

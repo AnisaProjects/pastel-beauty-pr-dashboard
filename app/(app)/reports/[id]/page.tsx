@@ -34,6 +34,7 @@ export default async function ReportDetailPage({
         id: row.id,
         generatedAt: row.generatedAt.toISOString(),
         generatedBy: row.generatedBy,
+        reportType: row.reportType === "standard" ? "standard" : "ai",
         model: row.model,
         status: row.status,
         contentMd: row.contentMd,

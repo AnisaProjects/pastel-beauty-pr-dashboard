@@ -80,9 +80,13 @@ export const aiReports = pgTable("ai_reports", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
   generatedBy: uuid("generated_by").references(() => users.id),
-  model: text("model").notNull(),
-  inputSnapshot: jsonb("input_snapshot").notNull(), // exact aggregate numbers fed to the prompt
-  contentMd: text("content_md").notNull(), // LLM-generated narrative (prose/bullets only)
+  // "ai" (OpenAI-written narrative) or "standard" (deterministic, template-
+  // generated from the same aggregates, no API call — the fallback for when
+  // an AI report isn't wanted or the OpenAI quota/latency is a concern).
+  reportType: text("report_type").notNull().default("ai"),
+  model: text("model").notNull(), // the OpenAI model used, or "standard-template" for non-AI reports
+  inputSnapshot: jsonb("input_snapshot").notNull(), // exact aggregate numbers fed to the prompt/template
+  contentMd: text("content_md").notNull(), // narrative (prose/bullets only)
   status: text("status").notNull().default("completed"),
 });
 

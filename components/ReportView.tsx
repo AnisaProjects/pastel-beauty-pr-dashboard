@@ -54,7 +54,7 @@ export default function ReportView({ report }: { report: ReportDetail }) {
     setRegenerating(true);
     setError(null);
     try {
-      const fresh = await generateReport();
+      const fresh = await generateReport(report.reportType);
       router.push(`/reports/${fresh.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate report");
@@ -68,7 +68,11 @@ export default function ReportView({ report }: { report: ReportDetail }) {
         <div>
           <h2>PR Performance Management Report</h2>
           <p className="report-meta">
-            Generated {fmtGeneratedAt(report.generatedAt)} · Model: {report.model} · Report #{report.id}
+            Generated {fmtGeneratedAt(report.generatedAt)} ·{" "}
+            <span className={`badge ${report.reportType === "ai" ? "ai" : "standard"}`}>
+              {report.reportType === "ai" ? "AI" : "Standard"}
+            </span>{" "}
+            · Model: {report.model} · Report #{report.id}
           </p>
           <p className="report-meta">
             {fmtNum(report.inputSnapshot.overall.sends)} sends analyzed · {fmtNum(report.inputSnapshot.overall.units)}{" "}

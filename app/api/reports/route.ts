@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { buildReportAggregates } from "@/lib/aggregations";
 import { generateReportMarkdown, getReportModel, ReportGenerationError } from "@/lib/openai";
 import { insertReport, listReports } from "@/lib/reports";
 import { requireUserId } from "@/lib/session";
+import { buildStandardReportMarkdown, STANDARD_REPORT_MODEL_LABEL } from "@/lib/standardReport";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,15 +15,25 @@ export async function GET() {
   return NextResponse.json({ reports });
 }
 
-// POST /api/reports -> runs the aggregations, calls OpenAI, inserts a new
-// ai_reports row. Never updates an existing report — "regenerate" is just
-// another POST, so past reports stay untouched.
-export async function POST() {
-  const userId = await requireUserId();
+type ReportType = "ai" | "standard";
 
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "OPENAI_API_KEY is not configured" }, { status: 503 });
+async function readReportType(req: NextRequest): Promise<ReportType> {
+  try {
+    const body = await req.json();
+    return body?.type === "standard" ? "standard" : "ai";
+  } catch {
+    return "ai"; // no/invalid body — default to the existing AI behavior
   }
+}
+
+// POST /api/reports -> runs the aggregations, then either calls OpenAI
+// ("ai") or fills a deterministic template ("standard", no API call — the
+// fallback when AI usage limits or latency are a concern). Inserts a new
+// ai_reports row either way; never updates an existing one, so "regenerate"
+// is just another POST and past reports stay untouched.
+export async function POST(req: NextRequest) {
+  const userId = await requireUserId();
+  const type = await readReportType(req);
 
   let aggregates;
   try {
@@ -30,6 +41,22 @@ export async function POST() {
   } catch (err) {
     console.error("POST /api/reports: aggregation failed", err);
     return NextResponse.json({ error: "Failed to compute report data." }, { status: 500 });
+  }
+
+  if (type === "standard") {
+    const contentMd = buildStandardReportMarkdown(aggregates);
+    const report = await insertReport({
+      generatedBy: userId,
+      reportType: "standard",
+      model: STANDARD_REPORT_MODEL_LABEL,
+      inputSnapshot: aggregates,
+      contentMd,
+    });
+    return NextResponse.json({ report }, { status: 201 });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "OPENAI_API_KEY is not configured" }, { status: 503 });
   }
 
   let contentMd: string;
@@ -45,6 +72,7 @@ export async function POST() {
 
   const report = await insertReport({
     generatedBy: userId,
+    reportType: "ai",
     model: getReportModel(),
     inputSnapshot: aggregates,
     contentMd,
