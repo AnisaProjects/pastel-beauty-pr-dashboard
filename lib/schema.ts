@@ -1,7 +1,7 @@
 // Drizzle ORM schema for the Pastel Beauty PR dashboard.
 //
 // Four tables:
-//  - users             named user accounts (Credentials auth, no roles yet)
+//  - users             named user accounts (Credentials auth, role-based: 'admin' | 'member')
 //  - pr_records        one row per PR "send" (a gift/package sent to a recipient)
 //  - pr_record_products line items (category + shade + quantity) for a send
 //  - ai_reports         Stage 2 — AI-generated management reports (included now so
@@ -29,6 +29,13 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  // 'admin' can manage users (add/deactivate/change role/reset password);
+  // 'member' has the same dashboard/report access as before, minus user
+  // management. Everyone can change their own password regardless of role.
+  role: text("role").notNull().default("member"),
+  // Deactivated accounts can't log in but are kept (not deleted) so their
+  // pr_records/ai_reports attribution (created_by/generated_by) stays intact.
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

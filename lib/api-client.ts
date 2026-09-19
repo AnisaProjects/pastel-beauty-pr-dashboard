@@ -1,6 +1,15 @@
 "use client";
 
-import type { MetaResponse, PrRecord, PrRecordInput, ReportDetail, ReportSummary, ReportType } from "@/lib/types";
+import type {
+  MetaResponse,
+  PrRecord,
+  PrRecordInput,
+  ReportDetail,
+  ReportSummary,
+  ReportType,
+  UserRole,
+  UserSummary,
+} from "@/lib/types";
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -87,4 +96,55 @@ export async function generateReport(type: ReportType = "ai"): Promise<ReportDet
     }),
   );
   return report;
+}
+
+// ---------- User management (admin-only, except changeOwnPassword) ----------
+
+export async function fetchUsers(): Promise<UserSummary[]> {
+  const { users } = await handle<{ users: UserSummary[] }>(await fetch("/api/users"));
+  return users;
+}
+
+export async function createUser(input: { name: string; email: string; password: string; role: UserRole }): Promise<UserSummary> {
+  const { user } = await handle<{ user: UserSummary }>(
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  );
+  return user;
+}
+
+async function patchUser(id: string, body: object): Promise<UserSummary> {
+  const { user } = await handle<{ user: UserSummary }>(
+    await fetch(`/api/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+  return user;
+}
+
+export function updateUserRole(id: string, role: UserRole): Promise<UserSummary> {
+  return patchUser(id, { role });
+}
+
+export function setUserActive(id: string, isActive: boolean): Promise<UserSummary> {
+  return patchUser(id, { isActive });
+}
+
+export function resetUserPassword(id: string, newPassword: string): Promise<UserSummary> {
+  return patchUser(id, { newPassword });
+}
+
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await handle(
+    await fetch("/api/account/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  );
 }

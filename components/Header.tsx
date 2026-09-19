@@ -1,12 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function Header({ userName }: { userName: string }) {
+import ChangePasswordModal from "@/components/ChangePasswordModal";
+import type { UserRole } from "@/lib/types";
+
+export default function Header({ userName, role }: { userName: string; role: UserRole }) {
   const pathname = usePathname();
   const isReports = pathname?.startsWith("/reports");
+  const isTeam = pathname?.startsWith("/team");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   return (
     <header className="top">
@@ -20,19 +26,28 @@ export default function Header({ userName }: { userName: string }) {
         </div>
         <div className="top-actions">
           <nav className="top-nav">
-            <Link href="/" className={isReports ? "" : "active"}>
+            <Link href="/" className={isReports || isTeam ? "" : "active"}>
               Dashboard
             </Link>
             <Link href="/reports" className={isReports ? "active" : ""}>
               Reports
             </Link>
+            {role === "admin" && (
+              <Link href="/team" className={isTeam ? "active" : ""}>
+                Team
+              </Link>
+            )}
           </nav>
           <span className="top-meta">{userName}</span>
+          <button className="btn ghost small" onClick={() => setChangingPassword(true)} type="button">
+            Change password
+          </button>
           <button className="btn ghost small" onClick={() => signOut({ callbackUrl: "/login" })}>
             Sign out
           </button>
         </div>
       </div>
+      {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
     </header>
   );
 }

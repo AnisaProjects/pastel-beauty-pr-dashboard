@@ -69,3 +69,16 @@ export type ReportDetail = ReportSummary & {
   inputSnapshot: import("@/lib/aggregations").ReportAggregates;
   contentMd: string;
 };
+
+// ---------- User management ----------
+
+export type UserRole = "admin" | "member";
+
+export type UserSummary = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+};

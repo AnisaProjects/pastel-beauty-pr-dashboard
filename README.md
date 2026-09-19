@@ -59,9 +59,13 @@ This started as a single static HTML dashboard (client-side only, data baked int
 - CSV export, JSON export/import
 - Fiscal-year filter chips, "include test/internal sends" toggle, search
 
-**Auth**
+**Auth & user management**
 - Named user accounts (email + password, bcrypt-hashed), no self-service signup
 - All pages and API routes require a session (enforced in `proxy.ts`, redirects to `/login`)
+- Two roles: **admin** (can manage users) and **member** (same dashboard/report access as before)
+- Admins get a **Team** page (`/team`): add a user, change anyone's role, reset a password, deactivate/reactivate an account (deactivating blocks login but keeps their history — nothing is deleted)
+- Everyone can change their own password from the header ("Change password"), which requires their current password
+- Safety rails: you can't deactivate your own account, and the last remaining admin can't be demoted or deactivated (so user management can never lock everyone out)
 
 **Reports** (`/reports`)
 - Generate an **AI report** or a **Standard report** (toggle before generating)
@@ -95,7 +99,8 @@ Browser ── (session cookie) ──> Next.js App Router
 Four tables (see `lib/schema.ts` for the full Drizzle definitions):
 
 ```
-users                  named login accounts (bcrypt password hash, no roles yet)
+users                  named login accounts: bcrypt password hash, role ('admin' | 'member'),
+                        is_active (deactivated accounts can't log in but aren't deleted)
 pr_records             one row per PR send: fiscal year, date, recipient, address/phone,
                         is_test flag, notes, total_qty (server-recomputed), is_deleted (soft delete)
 pr_record_products     line items for a send: category, shade, quantity
@@ -112,19 +117,23 @@ app/
   (app)/               authenticated layout + pages (require login)
     page.tsx           dashboard
     reports/           report list + report detail pages
+    team/              user management (admin-only)
   api/
     auth/[...nextauth] NextAuth route handler
     pr-records/        CRUD for PR sends (list/create/update/soft-delete/restore/bulk-import)
     meta/              distinct categories/shades
     reports/           list/generate reports, single report, PDF export
+    users/             admin-only user management (list/create/update role/active/reset password)
+    account/password/  self-service "change my password"
   login/               login page
   globals.css          full design system (CSS custom properties, components, print styles)
-components/            dashboard UI (KPIs, charts, table, modal, trash panel) + report UI
+components/            dashboard UI (KPIs, charts, table, modal, trash panel), report UI, TeamManagement, ChangePasswordModal
 lib/
   schema.ts            Drizzle schema (source of truth for the DB structure)
   db.ts                Drizzle client
-  auth.ts              NextAuth config (Credentials provider, JWT session)
-  session.ts           requireUserId() helper for route handlers
+  auth.ts              NextAuth config (Credentials provider, JWT session, role on the session)
+  session.ts           getSessionUser()/requireUserId()/requireAdminUserId() helpers for route handlers
+  users.ts             server-side data access for user management (create/role/active/password)
   pr-records.ts        server-side data access for PR sends
   reports.ts           server-side data access for ai_reports
   aggregations.ts      the real-number queries that feed both report types
@@ -135,7 +144,7 @@ lib/
   validate.ts          request-body validation for PR record writes
   loadEnv.ts           loads .env.local for plain Node scripts (drizzle-kit, scripts/*.ts)
 scripts/
-  seed-users.ts        creates/updates login accounts (the only way accounts are created)
+  seed-users.ts        bootstraps the first login account (see "Adding a teammate's login")
   extract-legacy-data.ts   one-time: pulled the original static dashboard's embedded data to JSON
   migrate-legacy-data.ts   one-time: loaded that JSON into the real database
   legacy-data.json     the extracted original 179 records (kept for reference/re-migration)
@@ -217,7 +226,9 @@ After adding or changing an env var, redeploy (`npx vercel --prod`) for it to ta
 
 ## Adding a teammate's login
 
-There's intentionally no signup page or admin UI — accounts are created by running a script:
+**Normal case**: an admin adds them from the **Team** page (`/team`) — name, email, a temporary password, and a role. The new teammate can change that password themselves afterward (header → "Change password"). Admins can also change anyone's role, reset a forgotten password, or deactivate an account from the same page.
+
+**Bootstrapping the very first account** (a fresh deployment with zero users — no one can sign in to reach `/team` yet) still goes through a script, same as before:
 
 1. Edit `scripts/seed-users.ts`, adding to `DEFAULT_USERS`:
    ```ts
@@ -227,6 +238,11 @@ There's intentionally no signup page or admin UI — accounts are created by run
    ```
 2. `npm run seed:users`
 3. **Remove what you just added from the file afterward** (it's a plaintext password sitting in a file that could get committed) — the account is already created in the database at this point; the script is safe to re-run with an empty list.
+4. That account is created with role `member` by default — promote it to `admin` once, directly in the database, so it can actually manage users:
+   ```sql
+   UPDATE users SET role = 'admin' WHERE email = 'their@email.com';
+   ```
+   (`npm run db:studio` is the easiest way to run this without writing a script.)
 
 Re-running with an existing email updates that user's name/password (useful for a password reset).
 
@@ -241,5 +257,5 @@ Both produce the same 9 sections (Executive Summary, Fiscal-Year Performance, PR
 
 - **`is_test` flagging looks inconsistent in the original data** — e.g. one legacy record is named "...(tester)" but isn't flagged as a test send. Both dashboard KPIs and reports (which exclude test sends by default) inherit this. Worth a manual data-quality pass if precise test/real separation matters.
 - **Recipient matching is exact, normalized-string based** (trimmed, lowercased). Near-duplicate names (typos, "Ltd" vs "Ltd.") are treated as different recipients, which can fragment repeat-customer stats. This matches the original static dashboard's behavior; fuzzy matching would be a separate feature.
-- **No password-reset or admin UI** — account creation/rotation is a script (`scripts/seed-users.ts`), by design, for a small team.
+- **Role/deactivation changes take up to 24h to apply to an already-logged-in session** — sessions are JWT-based (no per-request database check, by design, to keep pages fast), and `lib/auth.ts` intentionally sets a 24-hour session lifetime specifically so this window stays short rather than NextAuth's 30-day default. A change takes effect immediately for a deactivated user's *next* request only if their token is expired/they log in again; forcing an existing session to log out instantly would require a database check on every request, which wasn't worth the added latency for a small team.
 - **`/api/reports` has no rate limiting** — each "Generate report" click on "AI report" costs real OpenAI usage; there's a UI-level disable-while-generating guard but no server-side quota.
