@@ -48,3 +48,21 @@ export type MetaResponse = {
   categories: string[];
   shadesByCategory: Record<string, string[]>;
 };
+
+// Stage 2 — AI reports. `import type` from lib/aggregations.ts is erased at
+// compile time (no runtime import of lib/db.ts), so it's safe to reference
+// ReportAggregates from client components via this file.
+export type { ReportAggregates } from "@/lib/aggregations";
+
+export type ReportSummary = {
+  id: number;
+  generatedAt: string;
+  generatedBy: string | null;
+  model: string;
+  status: string;
+};
+
+export type ReportDetail = ReportSummary & {
+  inputSnapshot: import("@/lib/aggregations").ReportAggregates;
+  contentMd: string;
+};

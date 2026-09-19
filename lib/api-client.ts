@@ -1,6 +1,6 @@
 "use client";
 
-import type { MetaResponse, PrRecord, PrRecordInput } from "@/lib/types";
+import type { MetaResponse, PrRecord, PrRecordInput, ReportDetail, ReportSummary } from "@/lib/types";
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -64,4 +64,23 @@ export async function bulkImportPrRecords(records: PrRecordInput[]): Promise<{ i
       body: JSON.stringify(records),
     }),
   );
+}
+
+// ---------- Stage 2: AI reports ----------
+
+export async function fetchReports(): Promise<ReportSummary[]> {
+  const { reports } = await handle<{ reports: ReportSummary[] }>(await fetch("/api/reports"));
+  return reports;
+}
+
+export async function fetchReport(id: number | string): Promise<ReportDetail> {
+  const { report } = await handle<{ report: ReportDetail }>(await fetch(`/api/reports/${id}`));
+  return report;
+}
+
+export async function generateReport(): Promise<ReportDetail> {
+  const { report } = await handle<{ report: ReportDetail }>(
+    await fetch("/api/reports", { method: "POST" }),
+  );
+  return report;
 }
