@@ -80,6 +80,21 @@ export default function Dashboard() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 15000);
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [loadData]);
+
   const allFys = useMemo(() => {
     if (!records) return [];
     return Array.from(new Set(records.map((r) => r.fy))).sort();

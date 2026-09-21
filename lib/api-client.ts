@@ -27,12 +27,14 @@ async function handle<T>(res: Response): Promise<T> {
 
 export async function fetchPrRecords(opts: { deleted?: boolean } = {}): Promise<PrRecord[]> {
   const qs = opts.deleted ? "?deleted=1" : "";
-  const { records } = await handle<{ records: PrRecord[] }>(await fetch(`/api/pr-records${qs}`));
+  const { records } = await handle<{ records: PrRecord[] }>(
+    await fetch(`/api/pr-records${qs}`, { cache: "no-store" }),
+  );
   return records;
 }
 
 export async function fetchMeta(): Promise<MetaResponse> {
-  return handle<MetaResponse>(await fetch("/api/meta"));
+  return handle<MetaResponse>(await fetch("/api/meta", { cache: "no-store" }));
 }
 
 export async function createPrRecord(input: PrRecordInput): Promise<PrRecord> {
