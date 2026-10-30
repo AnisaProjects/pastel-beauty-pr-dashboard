@@ -3,11 +3,14 @@
 import { useMemo } from "react";
 import { Doughnut } from "react-chartjs-2";
 
-import "./chartSetup";
+import { chartTheme } from "./chartSetup";
+import { useTheme } from "@/components/ThemeProvider";
 import { colorForCategory } from "@/lib/categoryColors";
 import type { PrRecord } from "@/lib/types";
 
 export default function CategoryChart({ filtered, categories }: { filtered: PrRecord[]; categories: string[] }) {
+  const { theme } = useTheme();
+  const ct = chartTheme(theme);
   const entries = useMemo(() => {
     const sums: Record<string, number> = {};
     categories.forEach((c) => (sums[c] = 0));
@@ -32,7 +35,7 @@ export default function CategoryChart({ filtered, categories }: { filtered: PrRe
             data: entries.map((e) => e[1]),
             backgroundColor: entries.map((e) => colorForCategory(e[0])),
             borderWidth: 2,
-            borderColor: "#fff",
+            borderColor: ct.doughnutBorder,
           },
         ],
       }}
@@ -40,7 +43,7 @@ export default function CategoryChart({ filtered, categories }: { filtered: PrRe
         responsive: true,
         maintainAspectRatio: false,
         cutout: "58%",
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12, font: { size: 11 } } } },
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12, font: { size: 11 }, color: ct.text } } },
       }}
     />
   );

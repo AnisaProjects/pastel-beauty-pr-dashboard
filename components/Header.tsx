@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import ChangePasswordModal from "@/components/ChangePasswordModal";
+import ThemeToggle from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/types";
 
 export default function Header({ userName, role }: { userName: string; role: UserRole }) {
@@ -39,6 +40,7 @@ export default function Header({ userName, role }: { userName: string; role: Use
             )}
           </nav>
           <span className="top-meta">{userName}</span>
+          <ThemeToggle />
           <button className="btn ghost small" onClick={() => setChangingPassword(true)} type="button">
             Change password
           </button>

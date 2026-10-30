@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { PrRecord, PrRecordInput, ProductLine } from "@/lib/types";
+import { calculatePrValue } from "@/lib/pr-pricing";
 
 type ProductInput = { category: string; shade: string; quantity: number };
 
@@ -33,6 +34,7 @@ function rowToClient(
     notes: row.notes,
     totalQty: row.totalQty,
     products,
+    valuation: calculatePrValue(products),
     isDeleted: row.isDeleted,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

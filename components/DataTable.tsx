@@ -1,18 +1,21 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { fmtDate, fmtNum } from "@/lib/format";
+import { bsLabel } from "@/lib/nepali-date";
 import type { PrRecord } from "@/lib/types";
 
 type SortKey = "date" | "fy" | "name" | "address" | "totalQty" | "sendNum" | "status";
+type ColumnKey = SortKey | "prValue";
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "date", label: "Date" },
   { key: "fy", label: "FY" },
   { key: "name", label: "Recipient" },
   { key: "address", label: "Address" },
   { key: "totalQty", label: "Units" },
+  { key: "prValue", label: "PR Value (NPR)" },
   { key: "sendNum", label: "Visit #" },
   { key: "status", label: "Status" },
 ];
@@ -42,6 +45,7 @@ export default function DataTable({
   onEdit: (record: PrRecord) => void;
   onDelete: (record: PrRecord) => void;
 }) {
+  const [openValuation, setOpenValuation] = useState<number | null>(null);
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
     const arr = filtered.slice();
@@ -80,8 +84,9 @@ export default function DataTable({
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  className={col.key === sortKey ? "sorted" : ""}
-                  onClick={() => onSort(col.key)}
+                  className={col.key === "prValue" ? "" : col.key === sortKey ? "sorted" : ""}
+                  onClick={() => col.key !== "prValue" && onSort(col.key)}
+                  aria-sort={col.key === sortKey ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
                 >
                   {col.label}
                   {col.key === sortKey && <span className="arrow"> {sortDir === "asc" ? "▲" : "▼"}</span>}
@@ -92,7 +97,7 @@ export default function DataTable({
           <tbody id="tableBody">
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty-note">
+                <td colSpan={COLUMNS.length} className="empty-note">
                   No sends match the current filters
                 </td>
               </tr>
@@ -110,6 +115,19 @@ export default function DataTable({
                     <td>{r.name || "—"}</td>
                     <td>{r.address || "—"}</td>
                     <td>{fmtNum(r.totalQty)}</td>
+                    <td className="pr-value-cell" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="pr-value-trigger"
+                        aria-expanded={openValuation === r.id}
+                        aria-label={`Show PR value breakdown for ${r.name || "recipient"}`}
+                        onClick={() => setOpenValuation((current) => current === r.id ? null : r.id)}
+                      >
+                        {r.valuation?.complete && r.valuation.totalValue !== null
+                          ? `NPR ${fmtNum(r.valuation.totalValue)}`
+                          : "Price unavailable"}
+                      </button>
+                    </td>
                     <td>{r.sendNum || "—"}</td>
                     <td>
                       {r.isTest ? (
@@ -123,7 +141,7 @@ export default function DataTable({
                   </tr>
                   {isExpanded && (
                     <tr className="detail-row">
-                      <td colSpan={7}>
+                      <td colSpan={COLUMNS.length}>
                         <div className="detail-grid">
                           {r.products.length === 0 ? (
                             <span className="empty-note" style={{ padding: 0 }}>
@@ -134,13 +152,18 @@ export default function DataTable({
                               <span className="detail-chip" key={p.category + "::" + p.shade}>
                                 {p.shade}{" "}
                                 <b style={{ color: "var(--primary)" }}>×{fmtNum(p.quantity)}</b>{" "}
-                                <span style={{ color: "#999" }}>— {p.category}</span>
+                                <span style={{ color: "var(--muted-ink)" }}>— {p.category}</span>
                               </span>
                             ))
                           )}
                         </div>
-                        {r.notes && (
+                        {bsLabel(r.bsDate) && (
                           <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-soft)" }}>
+                            BS date: {bsLabel(r.bsDate)}
+                          </div>
+                        )}
+                        {r.notes && (
+                          <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-soft)" }}>
                             Note: {r.notes}
                           </div>
                         )}
@@ -173,6 +196,33 @@ export default function DataTable({
           </tbody>
         </table>
       </div>
+      {(() => {
+        const record = pageRows.find((item) => item.id === openValuation);
+        if (!record?.valuation) return null;
+        return (
+          <div className="pr-receipt-backdrop" onClick={() => setOpenValuation(null)}>
+            <section className="pr-receipt" role="dialog" aria-modal="true" aria-label="PR value receipt" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="pr-receipt-close" aria-label="Close receipt" onClick={() => setOpenValuation(null)}>×</button>
+              <div className="pr-receipt-heading">PR value receipt</div>
+              <div className="pr-receipt-meta"><b>Recipient</b><span>{record.name || "—"}</span></div>
+              <div className="pr-receipt-meta"><b>Date</b><span>{fmtDate(record.date)}</span></div>
+              <div className="pr-receipt-rule" />
+              {record.valuation.lines.length === 0 ? <div className="pr-receipt-empty">No product quantities recorded.</div> : record.valuation.lines.map((line, index) => (
+                <div className="pr-receipt-line" key={`${line.category}::${line.shade}::${index}`}>
+                  <div className="pr-receipt-product">{line.productName}</div>
+                  <div className="pr-receipt-detail">
+                    <span>{fmtNum(line.quantity)} × {line.unitPrice === null ? "Price unavailable" : `NPR ${fmtNum(line.unitPrice)}`}</span>
+                    <b>{line.subtotal === null ? "—" : `NPR ${fmtNum(line.subtotal)}`}</b>
+                  </div>
+                </div>
+              ))}
+              <div className="pr-receipt-rule" />
+              <div className="pr-receipt-total"><span>Total quantity</span><b>{fmtNum(record.valuation.totalQty)}</b></div>
+              <div className="pr-receipt-total grand"><span>{record.valuation.complete ? "Grand total" : "Incomplete valuation"}</span><b>{record.valuation.totalValue === null ? "Price unavailable" : `NPR ${fmtNum(record.valuation.totalValue)}`}</b></div>
+            </section>
+          </div>
+        );
+      })()}
       <div className="pagination" id="pagination">
         <button disabled={safePage <= 1} onClick={() => onPageChange(safePage - 1)}>
           ‹

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { fmtNum } from "@/lib/format";
+import { AD_MAX, AD_MIN, adToBs } from "@/lib/nepali-date";
 import type { PrRecord, PrRecordInput } from "@/lib/types";
 
 const NEW_OPTION = "__new__";
@@ -46,6 +47,11 @@ export default function RecordModal({
   const [newFy, setNewFy] = useState("");
   const [date, setDate] = useState("");
   const [bsDate, setBsDate] = useState("");
+  // "auto": bsDate tracks `date` via adToBs() and the field is read-only.
+  // "manual": the person is typing it themselves — used for legacy rows
+  // whose BS date doesn't match a straight conversion, and as a fallback
+  // for dates outside the converter's supported range (see lib/nepali-date.ts).
+  const [bsMode, setBsMode] = useState<"auto" | "manual">("auto");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -61,11 +67,17 @@ export default function RecordModal({
     if (!open) return;
     if (editingRecord) {
       const r = editingRecord;
+      const recordDate = r.date ? r.date.slice(0, 10) : "";
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFy(allFys.includes(r.fy) ? r.fy : NEW_OPTION);
       setNewFy(allFys.includes(r.fy) ? "" : r.fy);
-      setDate(r.date ? r.date.slice(0, 10) : "");
+      setDate(recordDate);
       setBsDate(r.bsDate || "");
+      // A saved BS date that matches what auto-conversion would produce from
+      // the send date is treated as auto (so editing the date keeps it in
+      // sync); anything else — legacy free text, an out-of-range date, a
+      // hand-typed override — stays in manual mode untouched.
+      setBsMode(r.bsDate && r.bsDate === adToBs(recordDate)?.iso ? "auto" : "manual");
       setName(r.name || "");
       setAddress(r.address || "");
       setPhone(r.phone || "");
@@ -81,6 +93,7 @@ export default function RecordModal({
       setNewFy("");
       setDate("");
       setBsDate("");
+      setBsMode("auto");
       setName("");
       setAddress("");
       setPhone("");
@@ -91,6 +104,24 @@ export default function RecordModal({
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingRecord]);
+
+  const bsPreview = useMemo(() => adToBs(date), [date]);
+
+  function handleDateChange(next: string) {
+    setDate(next);
+    if (bsMode === "auto") {
+      setBsDate(adToBs(next)?.iso || "");
+    }
+  }
+
+  function switchToManual() {
+    setBsMode("manual");
+  }
+
+  function switchToAuto() {
+    setBsMode("auto");
+    setBsDate(bsPreview?.iso || "");
+  }
 
   const resolvedProducts = useMemo(() => {
     return rows
@@ -182,16 +213,42 @@ export default function RecordModal({
           )}
           <div className="form-field">
             <label>Date sent</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input
+              type="date"
+              value={date}
+              min={AD_MIN}
+              max={AD_MAX}
+              onChange={(e) => handleDateChange(e.target.value)}
+            />
           </div>
           <div className="form-field">
-            <label>BS date (optional)</label>
-            <input
-              type="text"
-              value={bsDate}
-              onChange={(e) => setBsDate(e.target.value)}
-              placeholder="e.g. 2082-05-12"
-            />
+            <div className="field-note-row">
+              <label>BS date {bsMode === "auto" ? "(auto)" : "(manual)"}</label>
+              {bsMode === "auto" ? (
+                <button type="button" className="field-link-btn" onClick={switchToManual}>
+                  Enter manually
+                </button>
+              ) : (
+                <button type="button" className="field-link-btn" onClick={switchToAuto} disabled={!bsPreview}>
+                  Use calculated date
+                </button>
+              )}
+            </div>
+            {bsMode === "auto" ? (
+              <input type="text" value={bsPreview ? bsPreview.label : ""} readOnly placeholder="Pick a date sent above" />
+            ) : (
+              <input
+                type="text"
+                value={bsDate}
+                onChange={(e) => setBsDate(e.target.value)}
+                placeholder="e.g. 2082-05-12"
+              />
+            )}
+            {bsMode === "auto" && date && !bsPreview && (
+              <span className="field-note">
+                Outside the supported BS conversion range — enter it manually instead.
+              </span>
+            )}
           </div>
         </div>
 

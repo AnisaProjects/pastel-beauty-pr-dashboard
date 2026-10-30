@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import BgBlobs from "@/components/BgBlobs";
+import ThemeToggle from "@/components/ThemeToggle";
 import { auth } from "@/lib/auth";
 
 import LoginForm from "./LoginForm";
@@ -18,6 +19,9 @@ export default async function LoginPage({
   return (
     <div className="login-wrap">
       <BgBlobs />
+      <div className="login-theme-toggle">
+        <ThemeToggle />
+      </div>
       <div className="login-card">
         <div className="brand">
           <div className="mark">PB</div>

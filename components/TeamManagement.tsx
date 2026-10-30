@@ -163,6 +163,7 @@ export default function TeamManagement({ currentUserId }: { currentUserId: strin
 
       {users !== null && (
         <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
           <table className="data">
             <thead>
               <tr>
@@ -252,6 +253,7 @@ export default function TeamManagement({ currentUserId }: { currentUserId: strin
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

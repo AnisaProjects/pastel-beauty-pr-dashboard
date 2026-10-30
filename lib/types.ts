@@ -11,6 +11,8 @@ export type ProductLine = {
   quantity: number;
 };
 
+export type { PrValuation, PrValueLine } from "@/lib/pr-pricing";
+
 export type PrRecord = {
   id: number;
   fy: string;
@@ -23,6 +25,7 @@ export type PrRecord = {
   notes: string | null;
   totalQty: number;
   products: ProductLine[];
+  valuation?: import("@/lib/pr-pricing").PrValuation;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;

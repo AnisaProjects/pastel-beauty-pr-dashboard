@@ -3,10 +3,13 @@
 import { useMemo } from "react";
 import { Line } from "react-chartjs-2";
 
-import "./chartSetup";
+import { chartTheme } from "./chartSetup";
+import { useTheme } from "@/components/ThemeProvider";
 import type { PrRecord } from "@/lib/types";
 
 export default function TimelineChart({ filtered }: { filtered: PrRecord[] }) {
+  const { theme } = useTheme();
+  const ct = chartTheme(theme);
   const { labels, sends, units } = useMemo(() => {
     const byMonth: Record<string, { sends: number; units: number }> = {};
     filtered.forEach((r) => {
@@ -60,10 +63,21 @@ export default function TimelineChart({ filtered }: { filtered: PrRecord[] }) {
       options={{
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 14 } } },
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 14, color: ct.text } } },
         scales: {
-          y: { position: "left", title: { display: true, text: "Sends" }, grid: { color: "#F7ECEB" } },
-          y1: { position: "right", title: { display: true, text: "Units" }, grid: { drawOnChartArea: false } },
+          y: {
+            position: "left",
+            title: { display: true, text: "Sends", color: ct.text },
+            grid: { color: ct.grid },
+            ticks: { color: ct.text },
+          },
+          y1: {
+            position: "right",
+            title: { display: true, text: "Units", color: ct.text },
+            grid: { drawOnChartArea: false },
+            ticks: { color: ct.text },
+          },
+          x: { ticks: { color: ct.text } },
         },
       }}
     />

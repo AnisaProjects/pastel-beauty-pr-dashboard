@@ -3,10 +3,13 @@
 import { useMemo } from "react";
 import { Line } from "react-chartjs-2";
 
-import "@/components/charts/chartSetup";
+import { chartTheme } from "@/components/charts/chartSetup";
+import { useTheme } from "@/components/ThemeProvider";
 import type { MonthlyTrendRow } from "@/lib/aggregations";
 
 export default function MonthlyTrendChart({ rows }: { rows: MonthlyTrendRow[] }) {
+  const { theme } = useTheme();
+  const ct = chartTheme(theme);
   const { labels, sends, units } = useMemo(
     () => ({
       labels: rows.map((r) => {
@@ -52,10 +55,21 @@ export default function MonthlyTrendChart({ rows }: { rows: MonthlyTrendRow[] })
         options={{
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 14 } } },
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 14, color: ct.text } } },
           scales: {
-            y: { position: "left", title: { display: true, text: "Sends" }, grid: { color: "#F7ECEB" } },
-            y1: { position: "right", title: { display: true, text: "Units" }, grid: { drawOnChartArea: false } },
+            y: {
+              position: "left",
+              title: { display: true, text: "Sends", color: ct.text },
+              grid: { color: ct.grid },
+              ticks: { color: ct.text },
+            },
+            y1: {
+              position: "right",
+              title: { display: true, text: "Units", color: ct.text },
+              grid: { drawOnChartArea: false },
+              ticks: { color: ct.text },
+            },
+            x: { ticks: { color: ct.text } },
           },
         }}
       />

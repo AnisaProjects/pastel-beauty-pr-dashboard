@@ -1,3 +1,4 @@
+import { adToBs } from "@/lib/nepali-date";
 import type { PrRecordInput } from "@/lib/types";
 
 export class ValidationError extends Error {}
@@ -31,10 +32,16 @@ export function parsePrRecordInput(body: unknown): PrRecordInput {
     return { category, shade, quantity };
   });
 
+  // The dashboard form derives the BS date from the English date. For any
+  // other caller (JSON import, API) that leaves it blank, fill it in here so
+  // every stored row has one. An explicitly supplied value is never overwritten
+  // — legacy rows keep whatever the source workbook had.
+  const suppliedBsDate = typeof b.bsDate === "string" ? b.bsDate.trim() : "";
+
   return {
     fy,
     date,
-    bsDate: typeof b.bsDate === "string" ? b.bsDate.trim() || null : null,
+    bsDate: suppliedBsDate || adToBs(date)?.iso || null,
     name: typeof b.name === "string" ? b.name.trim() || null : null,
     address: typeof b.address === "string" ? b.address.trim() || null : null,
     phone: typeof b.phone === "string" ? b.phone.trim() || null : null,

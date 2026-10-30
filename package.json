@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
+    "@remotemerge/nepali-date-converter": "^1.2.1",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",

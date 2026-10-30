@@ -21,7 +21,7 @@ import FilterBar from "@/components/FilterBar";
 import KpiStrip from "@/components/KpiStrip";
 import Leaderboard from "@/components/Leaderboard";
 import RecordModal from "@/components/RecordModal";
-import Toast from "@/components/Toast";
+import { useToast } from "@/components/ToastProvider";
 import TrashPanel from "@/components/TrashPanel";
 import { exportCsv } from "@/lib/csv";
 import { fmtDate } from "@/lib/format";
@@ -52,14 +52,7 @@ export default function Dashboard() {
   const [trashRecords, setTrashRecords] = useState<PrRecord[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
 
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2600);
-  }, []);
+  const toast = useToast();
 
   const loadData = useCallback(async () => {
     try {
@@ -78,21 +71,6 @@ export default function Dashboard() {
     // its `await`s resolve, not synchronously within this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
-  }, [loadData]);
-
-  useEffect(() => {
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") loadData();
-    };
-    const interval = window.setInterval(refreshWhenVisible, 15000);
-
-    window.addEventListener("focus", refreshWhenVisible);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshWhenVisible);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
   }, [loadData]);
 
   const allFys = useMemo(() => {
@@ -187,10 +165,18 @@ export default function Dashboard() {
     try {
       if (editingRecord) {
         await apiUpdate(editingRecord.id, input);
-        showToast("Changes saved");
+        if (input.isTest) {
+          toast.warning("Saved as a test/internal send — hidden from totals unless you include test/internal sends.");
+        } else {
+          toast.success("Changes saved");
+        }
       } else {
         await apiCreate(input);
-        showToast("PR send added");
+        if (input.isTest) {
+          toast.warning("Saved as a test/internal send — hidden from totals unless you include test/internal sends.");
+        } else {
+          toast.success("PR send added");
+        }
       }
       closeModal();
       setExpanded(null);
@@ -202,7 +188,7 @@ export default function Dashboard() {
         return next;
       });
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSubmitting(false);
     }
@@ -213,10 +199,12 @@ export default function Dashboard() {
     try {
       await apiDelete(r.id);
       setExpanded(null);
-      showToast('Row removed — restore it anytime from "Removed rows"');
+      toast.success('Row removed', {
+        action: { label: "Undo", onClick: () => handleRestore(r) },
+      });
       await loadData();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     }
   }
 
@@ -227,7 +215,7 @@ export default function Dashboard() {
       const deleted = await fetchPrRecords({ deleted: true });
       setTrashRecords(deleted);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to load removed rows");
+      toast.error(err instanceof Error ? err.message : "Failed to load removed rows");
     } finally {
       setTrashLoading(false);
     }
@@ -237,10 +225,10 @@ export default function Dashboard() {
     try {
       await apiRestore(r.id);
       setTrashRecords((prev) => prev.filter((x) => x.id !== r.id));
-      showToast("Row restored");
+      toast.success("Row restored");
       await loadData();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Restore failed");
+      toast.error(err instanceof Error ? err.message : "Restore failed");
     }
   }
 
@@ -275,10 +263,10 @@ export default function Dashboard() {
         }),
       }));
       const result = await bulkImportPrRecords(inputs);
-      showToast(`Imported ${result.inserted} entr${result.inserted === 1 ? "y" : "ies"}`);
+      toast.success(`Imported ${result.inserted} entr${result.inserted === 1 ? "y" : "ies"}`);
       await loadData();
     } catch {
-      showToast('Couldn\'t read that file — make sure it\'s a JSON backup created by this dashboard.');
+      toast.error("Couldn't read that file — make sure it's a JSON backup created by this dashboard.");
     }
   }
 
@@ -323,6 +311,10 @@ export default function Dashboard() {
         onToggleIncludeTest={(v) => {
           setIncludeTest(v);
           setPage(1);
+          toast.info(v ? "Now showing test/internal sends too" : "Test/internal sends hidden again", {
+            id: "include-test-toggle",
+            duration: 2200,
+          });
         }}
         search={search}
         onSearchChange={(v) => {
@@ -448,8 +440,6 @@ export default function Dashboard() {
         onClose={() => setTrashOpen(false)}
         onRestore={handleRestore}
       />
-
-      <Toast message={toast} />
     </div>
   );
 }

@@ -3,11 +3,14 @@
 import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 
-import "./chartSetup";
+import { chartTheme } from "./chartSetup";
+import { useTheme } from "@/components/ThemeProvider";
 import { colorForCategory } from "@/lib/categoryColors";
 import type { PrRecord } from "@/lib/types";
 
 export default function ShadesChart({ filtered }: { filtered: PrRecord[] }) {
+  const { theme } = useTheme();
+  const ct = chartTheme(theme);
   const entries = useMemo(() => {
     const sums: Record<string, number> = {};
     const catOf: Record<string, string> = {};
@@ -46,7 +49,10 @@ export default function ShadesChart({ filtered }: { filtered: PrRecord[] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { x: { grid: { color: "#F7ECEB" } }, y: { grid: { display: false } } },
+        scales: {
+          x: { grid: { color: ct.grid }, ticks: { color: ct.text } },
+          y: { grid: { display: false }, ticks: { color: ct.text } },
+        },
       }}
     />
   );
