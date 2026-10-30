@@ -25,10 +25,28 @@ import { useToast } from "@/components/ToastProvider";
 import TrashPanel from "@/components/TrashPanel";
 import { exportCsv } from "@/lib/csv";
 import { fmtDate } from "@/lib/format";
+import { parsePrImport } from "@/lib/import-pr";
 import { recomputeDerived } from "@/lib/recompute";
 import type { MetaResponse, PrRecord, PrRecordInput } from "@/lib/types";
 
 type SortKey = "date" | "fy" | "name" | "address" | "totalQty" | "sendNum" | "status";
+
+function importIdentity(record: PrRecordInput | PrRecord): string {
+  const text = (value: string | null | undefined) => (value ?? "").trim().toLocaleLowerCase();
+  const products = record.products
+    .map((product) => [text(product.category), text(product.shade), Number(product.quantity)])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return JSON.stringify([
+    record.fy,
+    (record.date ?? "").slice(0, 10),
+    text(record.name),
+    text(record.address),
+    text(record.phone),
+    text(record.notes),
+    record.isTest,
+    products,
+  ]);
+}
 
 export default function Dashboard() {
   const [records, setRecords] = useState<PrRecord[] | null>(null);
@@ -245,28 +263,28 @@ export default function Dashboard() {
     e.target.value = "";
     if (!file) return;
     try {
-      const text = await file.text();
-      const arr = JSON.parse(text);
-      if (!Array.isArray(arr)) throw new Error("not an array");
-      const inputs: PrRecordInput[] = arr.map((rec) => ({
-        fy: rec.fy,
-        date: (rec.date || "").slice(0, 10),
-        bsDate: rec.bsDate ?? null,
-        name: rec.name ?? null,
-        address: rec.address ?? null,
-        phone: rec.phone ?? null,
-        isTest: !!rec.isTest,
-        notes: rec.notes ?? null,
-        products: Object.entries(rec.products || {}).map(([key, qty]) => {
-          const sep = key.indexOf("::");
-          return { category: key.slice(0, sep), shade: key.slice(sep + 2), quantity: Number(qty) };
-        }),
-      }));
+      const parsed = await parsePrImport(file);
+      let inputs = parsed;
+      let skippedDuplicates = 0;
+      const isSpreadsheet = file.name.toLowerCase().endsWith(".csv") || file.name.toLowerCase().endsWith(".xlsx");
+      if (isSpreadsheet) {
+        const known = new Set((records ?? []).map(importIdentity));
+        inputs = parsed.filter((record) => {
+          const key = importIdentity(record);
+          if (known.has(key)) { skippedDuplicates++; return false; }
+          known.add(key);
+          return true;
+        });
+      }
+      if (isSpreadsheet && parsed.length > 0 && inputs.length === 0) {
+        toast.success(`All ${parsed.length} spreadsheet sends already exist; no duplicates added`);
+        return;
+      }
       const result = await bulkImportPrRecords(inputs);
-      toast.success(`Imported ${result.inserted} entr${result.inserted === 1 ? "y" : "ies"}`);
+      toast.success(`Imported ${result.inserted} entr${result.inserted === 1 ? "y" : "ies"}${skippedDuplicates ? `; skipped ${skippedDuplicates} existing` : ""}`);
       await loadData();
-    } catch {
-      toast.error("Couldn't read that file — make sure it's a JSON backup created by this dashboard.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't read this file. Check its columns and try again.");
     }
   }
 
@@ -380,20 +398,20 @@ export default function Dashboard() {
         </div>
         <div className="panel" style={{ padding: "16px 18px" }}>
           <div className="table-toolbar">
-            <span />
+            <span className="note">Import JSON, CSV, or Excel (.xlsx, latest FY tab)</span>
             <div className="actions">
               <button className="btn ghost small" onClick={handleExportCsv}>
                 Export CSV
               </button>
               <button className="btn ghost small" onClick={handleImportClick}>
-                Import JSON
+                Import file
               </button>
               <button className="btn ghost small" onClick={openTrash}>
                 Removed rows
               </button>
               <input
                 type="file"
-                accept="application/json"
+                accept=".json,.csv,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ref={importInputRef}
                 style={{ display: "none" }}
                 onChange={handleImportFile}
