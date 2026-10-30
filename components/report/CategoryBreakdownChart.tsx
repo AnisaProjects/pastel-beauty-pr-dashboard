@@ -15,26 +15,40 @@ export default function CategoryBreakdownChart({ rows }: { rows: CategoryRow[] }
   }
 
   return (
-    <div className="canvas-box">
-      <Doughnut
-        data={{
-          labels: rows.map((r) => `${r.category} (${r.pctOfTotal.toFixed(1)}%)`),
-          datasets: [
-            {
-              data: rows.map((r) => r.units),
-              backgroundColor: rows.map((r) => colorForCategory(r.category)),
-              borderWidth: 2,
-              borderColor: ct.doughnutBorder,
-            },
-          ],
-        }}
-        options={{
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: "58%",
-          plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12, font: { size: 11 }, color: ct.text } } },
-        }}
-      />
-    </div>
+    <>
+      <div className="canvas-box">
+        <Doughnut
+          data={{
+            labels: rows.map((r) => `${r.category} (${r.pctOfTotal.toFixed(1)}%)`),
+            datasets: [
+              {
+                data: rows.map((r) => r.units),
+                backgroundColor: rows.map((r) => colorForCategory(r.category)),
+                borderWidth: 2,
+                borderColor: ct.doughnutBorder,
+              },
+            ],
+          }}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "58%",
+            plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12, font: { size: 11 }, color: ct.text } } },
+          }}
+        />
+      </div>
+      <div className="report-table-wrap">
+        <table className="report-table">
+          <thead><tr><th>Category</th><th className="num">PR value (NPR)</th><th className="num">Unpriced lines</th></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.category}>
+              <td>{r.category}</td>
+              <td className="num">{r.prValueNpr === undefined ? "—" : r.prValueNpr.toLocaleString("en-US")}</td>
+              <td className="num">{r.unpricedProductLines === undefined ? "—" : r.unpricedProductLines.toLocaleString("en-US")}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </>
   );
 }

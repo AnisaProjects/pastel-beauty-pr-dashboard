@@ -33,6 +33,12 @@ function executiveSummary(a: ReportAggregates): string {
     `Across ${perFiscalYear.length} fiscal year${perFiscalYear.length === 1 ? "" : "s"} of recorded activity, Pastel Beauty made ${fmt(overall.sends)} PR sends totaling ${fmt(overall.units)} units` +
       (overall.excludedTestSends > 0 ? ` (${fmt(overall.excludedTestSends)} test/internal sends excluded from these figures).` : "."),
   );
+  if (a.prValue) {
+    const incompleteNote = a.prValue.incompleteSends > 0
+      ? ` ${fmt(a.prValue.incompleteSends)} sends are incompletely valued${a.prValue.unpricedProductLines > 0 ? ` across ${fmt(a.prValue.unpricedProductLines)} unpriced product lines` : " because they have no product lines"}.`
+      : ` All ${fmt(a.prValue.valuedSends)} sends are fully valued.`;
+    sentences.push(`Known PR product value totals NPR ${fmt(a.prValue.knownValueNpr)}.${incompleteNote}`);
+  }
   if (latestFy) {
     sentences.push(
       `The most recent fiscal year, FY ${latestFy.fiscalYear}, recorded ${fmt(latestFy.sends)} sends and ${fmt(latestFy.units)} units` +
@@ -57,7 +63,8 @@ function fiscalYearPerformance(a: ReportAggregates): string {
   if (perFiscalYear.length === 0) return "No fiscal-year data available.";
   const lines = perFiscalYear.map((fy) => {
     const change = fy.unitsChangePct !== null ? ` (${pct(fy.unitsChangePct)} units vs. the prior fiscal year)` : "";
-    return `- FY ${fy.fiscalYear}: ${fmt(fy.sends)} sends, ${fmt(fy.units)} units${change}`;
+    const value = fy.prValueNpr === undefined ? "" : `, PR value NPR ${fmt(fy.prValueNpr)}${fy.incompleteValuationSends ? ` (${fmt(fy.incompleteValuationSends)} incomplete sends)` : ""}`;
+    return `- FY ${fy.fiscalYear}: ${fmt(fy.sends)} sends, ${fmt(fy.units)} units${value}${change}`;
   });
   const best = [...perFiscalYear].sort((x, y) => y.units - x.units)[0];
   lines.push(`\nThe highest-volume fiscal year on record is FY ${best.fiscalYear}, with ${fmt(best.units)} units sent.`);
@@ -91,13 +98,13 @@ function topRecipientsSection(a: ReportAggregates): string {
 function categoryPerformance(a: ReportAggregates): string {
   const { categoryBreakdown } = a;
   if (categoryBreakdown.length === 0) return "No category data available.";
-  return categoryBreakdown.map((c) => `- ${c.category}: ${fmt(c.units)} units (${c.pctOfTotal}% of total)`).join("\n");
+  return categoryBreakdown.map((c) => `- ${c.category}: ${fmt(c.units)} units (${c.pctOfTotal}% of total), PR value NPR ${c.prValueNpr === undefined ? "unavailable" : fmt(c.prValueNpr)}${c.unpricedProductLines ? ` (${fmt(c.unpricedProductLines)} unpriced lines)` : ""}`).join("\n");
 }
 
 function shadePerformance(a: ReportAggregates): string {
   const { shadeBreakdown } = a;
   if (shadeBreakdown.length === 0) return "No shade-level data available.";
-  return shadeBreakdown.map((s) => `- ${s.category} — ${s.shade}: ${fmt(s.units)} units (${s.pctOfTotal}% of total)`).join("\n");
+  return shadeBreakdown.map((s) => `- ${s.category} — ${s.shade}: ${fmt(s.units)} units (${s.pctOfTotal}% of total), PR value NPR ${s.prValueNpr === undefined ? "unavailable" : fmt(s.prValueNpr)}${s.unpricedProductLines ? ` (${fmt(s.unpricedProductLines)} unpriced lines)` : ""}`).join("\n");
 }
 
 function repeatRecipientAnalysis(a: ReportAggregates): string {

@@ -17,6 +17,8 @@ export default function FyPerformanceTable({ rows }: { rows: FiscalYearRow[] }) 
             <th>Fiscal Year</th>
             <th className="num">Sends</th>
             <th className="num">Units</th>
+            <th className="num">PR value (NPR)</th>
+            <th className="num">Incomplete sends</th>
             <th className="num">vs. Prior FY</th>
           </tr>
         </thead>
@@ -26,6 +28,8 @@ export default function FyPerformanceTable({ rows }: { rows: FiscalYearRow[] }) 
               <td>FY {r.fiscalYear}</td>
               <td className="num">{fmtNum(r.sends)}</td>
               <td className="num">{fmtNum(r.units)}</td>
+              <td className="num">{r.prValueNpr === undefined ? "—" : fmtNum(r.prValueNpr)}</td>
+              <td className="num">{r.incompleteValuationSends === undefined ? "—" : fmtNum(r.incompleteValuationSends)}</td>
               <td className="num">{pct(r.unitsChangePct)}</td>
             </tr>
           ))}

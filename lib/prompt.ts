@@ -33,7 +33,8 @@ STRICT RULES:
 ${SECTION_HEADINGS.map((h) => `   ## ${h}`).join("\n")}
 4. Write prose and bullet points only. Do NOT produce Markdown tables — the application renders the real numeric tables and charts separately from this same data; your job is narrative framing and interpretation only, never numeric transcription.
 5. Tone: concise, professional, management-facing. No marketing language, no exclamation points, no filler.
-6. "Executive Summary" should be 3-5 sentences summarizing the most important facts from the other sections. "Key Observations" and "Suggested Areas to Review" should be bullet lists grounded in the same data (e.g. a category that dropped, a fiscal year with unusually high test-send volume, concentration in a small number of recipients) — do not suggest generic PR advice unrelated to the actual numbers provided.`;
+6. "Executive Summary" should be 3-5 sentences summarizing the most important facts from the other sections, including the known PR product value in NPR and a clear caveat when any sends or product lines have incomplete valuations. "Key Observations" and "Suggested Areas to Review" should be bullet lists grounded in the same data (e.g. a category that dropped, a fiscal year with unusually high test-send volume, concentration in a small number of recipients) — do not suggest generic PR advice unrelated to the actual numbers provided.
+7. Use the supplied PR value fields when describing monetary totals or category/fiscal-year comparisons. The knownValueNpr field sums only product lines matched to the official price list; incompleteSends and unpricedProductLines identify coverage gaps. Never describe a partial known value as a complete grand total.`;
 
   const user = `Here is the current PR-sending data for Pastel Beauty, aggregated from the live database as of ${aggregates.generatedAt}. Write the management report described in your instructions using only this data:
 

@@ -276,6 +276,10 @@ function fmtInt(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+function fmtOptionalInt(n: number | undefined): string {
+  return n === undefined ? "—" : fmtInt(n);
+}
+
 // Real data tables rendered from input_snapshot (never from LLM text) for
 // the sections where numbers matter most.
 const SECTIONS_WITH_DATA_TABLE = new Set<string>([
@@ -293,12 +297,16 @@ function fyTable(rows: FiscalYearRow[]) {
         { key: "fiscalYear", label: "Fiscal Year" },
         { key: "sends", label: "Sends", align: "right" },
         { key: "units", label: "Units", align: "right" },
+        { key: "prValue", label: "PR Value (NPR)", align: "right" },
+        { key: "incomplete", label: "Incomplete Sends", align: "right" },
         { key: "change", label: "vs. Prior FY", align: "right" },
       ]}
       rows={rows.map((r) => ({
         fiscalYear: `FY ${r.fiscalYear}`,
         sends: fmtInt(r.sends),
         units: fmtInt(r.units),
+        prValue: fmtOptionalInt(r.prValueNpr),
+        incomplete: fmtOptionalInt(r.incompleteValuationSends),
         change: pct(r.unitsChangePct),
       }))}
     />
@@ -324,9 +332,11 @@ function categoryTable(rows: CategoryRow[]) {
       columns={[
         { key: "category", label: "Category" },
         { key: "units", label: "Units", align: "right" },
+        { key: "prValue", label: "PR Value (NPR)", align: "right" },
+        { key: "unpriced", label: "Unpriced Lines", align: "right" },
         { key: "pct", label: "% of Total", align: "right" },
       ]}
-      rows={rows.map((r) => ({ category: r.category, units: fmtInt(r.units), pct: pct(r.pctOfTotal) }))}
+      rows={rows.map((r) => ({ category: r.category, units: fmtInt(r.units), prValue: fmtOptionalInt(r.prValueNpr), unpriced: fmtOptionalInt(r.unpricedProductLines), pct: pct(r.pctOfTotal) }))}
     />
   );
 }
@@ -338,12 +348,16 @@ function shadeTable(rows: ShadeRow[]) {
         { key: "category", label: "Category" },
         { key: "shade", label: "Shade" },
         { key: "units", label: "Units", align: "right" },
+        { key: "prValue", label: "PR Value (NPR)", align: "right" },
+        { key: "unpriced", label: "Unpriced Lines", align: "right" },
         { key: "pct", label: "% of Total", align: "right" },
       ]}
       rows={rows.map((r) => ({
         category: r.category,
         shade: r.shade,
         units: fmtInt(r.units),
+        prValue: fmtOptionalInt(r.prValueNpr),
+        unpriced: fmtOptionalInt(r.unpricedProductLines),
         pct: pct(r.pctOfTotal),
       }))}
     />
@@ -407,6 +421,12 @@ export function ReportPdfDocument({ report }: { report: PdfReport }) {
         <Text style={styles.coverMeta}>
           ({fmtInt(report.inputSnapshot.overall.excludedTestSends)} test/internal sends excluded from analysis)
         </Text>
+        {report.inputSnapshot.prValue && (
+          <Text style={styles.coverMeta}>
+            Known PR product value: NPR {fmtInt(report.inputSnapshot.prValue.knownValueNpr)} - Fully valued sends:{" "}
+            {fmtInt(report.inputSnapshot.prValue.valuedSends)} - Incomplete sends: {fmtInt(report.inputSnapshot.prValue.incompleteSends)}
+          </Text>
+        )}
         <View style={styles.coverDivider} />
         <Text style={styles.paragraph}>
           This report is generated from live data in the Pastel Beauty PR tracking database. All totals,

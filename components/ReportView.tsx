@@ -78,6 +78,16 @@ export default function ReportView({ report }: { report: ReportDetail }) {
             {fmtNum(report.inputSnapshot.overall.sends)} sends analyzed · {fmtNum(report.inputSnapshot.overall.units)}{" "}
             units ({fmtNum(report.inputSnapshot.overall.excludedTestSends)} test sends excluded)
           </p>
+          {report.inputSnapshot.prValue && (
+            <p className="report-meta">
+              Known PR product value: NPR {fmtNum(report.inputSnapshot.prValue.knownValueNpr)} ·{" "}
+              {fmtNum(report.inputSnapshot.prValue.valuedSends)} fully valued sends ·{" "}
+              {fmtNum(report.inputSnapshot.prValue.incompleteSends)} incomplete
+              {report.inputSnapshot.prValue.unpricedProductLines > 0
+                ? ` (${fmtNum(report.inputSnapshot.prValue.unpricedProductLines)} unpriced product lines)`
+                : ""}
+            </p>
+          )}
         </div>
         <div className="report-actions">
           <button type="button" className="btn ghost small" onClick={() => router.push("/reports")}>

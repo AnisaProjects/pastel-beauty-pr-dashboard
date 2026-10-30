@@ -9,6 +9,8 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import { calculatePrValue } from "@/lib/pr-pricing";
+import type { ProductLine } from "@/lib/types";
 
 const { prRecords, prRecordProducts } = schema;
 
@@ -24,6 +26,13 @@ export interface OverallTotals {
   sends: number;
   units: number;
   excludedTestSends: number;
+}
+
+export interface PrValueTotals {
+  knownValueNpr: number;
+  valuedSends: number;
+  incompleteSends: number;
+  unpricedProductLines: number;
 }
 
 export async function getOverallTotals(): Promise<OverallTotals> {
@@ -48,6 +57,8 @@ export interface FiscalYearRow {
   sends: number;
   units: number;
   unitsChangePct: number | null; // vs. prior FY in the list, null for the first
+  prValueNpr?: number;
+  incompleteValuationSends?: number;
 }
 
 export async function getPerFiscalYear(): Promise<FiscalYearRow[]> {
@@ -121,6 +132,8 @@ export interface CategoryRow {
   category: string;
   units: number;
   pctOfTotal: number;
+  prValueNpr?: number;
+  unpricedProductLines?: number;
 }
 
 export async function getCategoryBreakdown(): Promise<CategoryRow[]> {
@@ -147,6 +160,8 @@ export interface ShadeRow {
   shade: string;
   units: number;
   pctOfTotal: number;
+  prValueNpr?: number;
+  unpricedProductLines?: number;
 }
 
 export async function getShadeBreakdown(limit = 15): Promise<ShadeRow[]> {
@@ -228,11 +243,79 @@ export interface ReportAggregates {
   categoryBreakdown: CategoryRow[];
   shadeBreakdown: ShadeRow[];
   repeatVsNew: RepeatRow[];
+  // Optional for compatibility with reports generated before value reporting
+  // was introduced. New report snapshots always include this object.
+  prValue?: PrValueTotals;
   generatedAt: string; // ISO timestamp, so the prompt/report can state "as of"
 }
 
+type ValueBucket = { prValueNpr: number; incompleteValuationSends: number; unpricedProductLines: number };
+
+async function getPrValueBreakdown(): Promise<{
+  summary: PrValueTotals;
+  perFiscalYear: Map<string, ValueBucket>;
+  perCategory: Map<string, ValueBucket>;
+  perShade: Map<string, ValueBucket>;
+}> {
+  const rows = await db
+    .select({
+      recordId: prRecords.id,
+      fiscalYear: prRecords.fiscalYear,
+      category: prRecordProducts.category,
+      shade: prRecordProducts.shade,
+      quantity: prRecordProducts.quantity,
+    })
+    .from(prRecords)
+    .leftJoin(prRecordProducts, eq(prRecords.id, prRecordProducts.prRecordId))
+    .where(notTestOrDeleted);
+
+  const records = new Map<number, { fiscalYear: string; products: ProductLine[] }>();
+  for (const row of rows) {
+    const record = records.get(row.recordId) ?? { fiscalYear: row.fiscalYear, products: [] };
+    if (row.category !== null && row.shade !== null && row.quantity !== null) {
+      record.products.push({ category: row.category, shade: row.shade, quantity: row.quantity });
+    }
+    records.set(row.recordId, record);
+  }
+
+  const summary: PrValueTotals = { knownValueNpr: 0, valuedSends: 0, incompleteSends: 0, unpricedProductLines: 0 };
+  const perFiscalYear = new Map<string, ValueBucket>();
+  const perCategory = new Map<string, ValueBucket>();
+  const perShade = new Map<string, ValueBucket>();
+  const bucket = (map: Map<string, ValueBucket>, key: string) => {
+    const value = map.get(key) ?? { prValueNpr: 0, incompleteValuationSends: 0, unpricedProductLines: 0 };
+    map.set(key, value);
+    return value;
+  };
+
+  for (const record of records.values()) {
+    const valuation = calculatePrValue(record.products);
+    if (valuation.complete) summary.valuedSends += 1;
+    else {
+      summary.incompleteSends += 1;
+      bucket(perFiscalYear, record.fiscalYear).incompleteValuationSends += 1;
+    }
+
+    for (const line of valuation.lines) {
+      const amount = line.subtotal ?? 0;
+      const unavailable = line.unitPrice === null ? 1 : 0;
+      summary.knownValueNpr += amount;
+      summary.unpricedProductLines += unavailable;
+      bucket(perFiscalYear, record.fiscalYear).prValueNpr += amount;
+      bucket(perFiscalYear, record.fiscalYear).unpricedProductLines += unavailable;
+      bucket(perCategory, line.category).prValueNpr += amount;
+      bucket(perCategory, line.category).unpricedProductLines += unavailable;
+      const shadeKey = `${line.category}::${line.shade}`;
+      bucket(perShade, shadeKey).prValueNpr += amount;
+      bucket(perShade, shadeKey).unpricedProductLines += unavailable;
+    }
+  }
+
+  return { summary, perFiscalYear, perCategory, perShade };
+}
+
 export async function buildReportAggregates(): Promise<ReportAggregates> {
-  const [overall, perFiscalYear, monthlyTrend, topRecipients, categoryBreakdown, shadeBreakdown, repeatVsNew] =
+  const [overall, perFiscalYear, monthlyTrend, topRecipients, categoryBreakdown, shadeBreakdown, repeatVsNew, valueBreakdown] =
     await Promise.all([
       getOverallTotals(),
       getPerFiscalYear(),
@@ -241,16 +324,36 @@ export async function buildReportAggregates(): Promise<ReportAggregates> {
       getCategoryBreakdown(),
       getShadeBreakdown(),
       getRepeatVsNew(),
+      getPrValueBreakdown(),
     ]);
+
+  const valuedFiscalYears = perFiscalYear.map((row) => {
+    const value = valueBreakdown.perFiscalYear.get(row.fiscalYear);
+    return {
+      ...row,
+      prValueNpr: value?.prValueNpr ?? 0,
+      incompleteValuationSends: value?.incompleteValuationSends ?? 0,
+      unpricedProductLines: value?.unpricedProductLines ?? 0,
+    };
+  });
+  const valuedCategories = categoryBreakdown.map((row) => {
+    const value = valueBreakdown.perCategory.get(row.category);
+    return { ...row, prValueNpr: value?.prValueNpr ?? 0, unpricedProductLines: value?.unpricedProductLines ?? 0 };
+  });
+  const valuedShades = shadeBreakdown.map((row) => {
+    const value = valueBreakdown.perShade.get(`${row.category}::${row.shade}`);
+    return { ...row, prValueNpr: value?.prValueNpr ?? 0, unpricedProductLines: value?.unpricedProductLines ?? 0 };
+  });
 
   return {
     overall,
-    perFiscalYear,
+    perFiscalYear: valuedFiscalYears,
     monthlyTrend,
     topRecipients,
-    categoryBreakdown,
-    shadeBreakdown,
+    categoryBreakdown: valuedCategories,
+    shadeBreakdown: valuedShades,
     repeatVsNew,
+    prValue: valueBreakdown.summary,
     generatedAt: new Date().toISOString(),
   };
 }
