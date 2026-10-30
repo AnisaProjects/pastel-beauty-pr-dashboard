@@ -77,7 +77,7 @@ export default function DataTable({
       <span className="count" id="rowCount">
         {sorted.length} send{sorted.length === 1 ? "" : "s"} matching current filters
       </span>
-      <div style={{ overflowX: "auto" }}>
+      <div className="data-table-scroll">
         <table className="data" id="dataTable">
           <thead>
             <tr>
