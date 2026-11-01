@@ -30,6 +30,11 @@ export async function getReport(id: number): Promise<AiReportRow | null> {
   return row ?? null;
 }
 
+export async function deleteReport(id: number): Promise<boolean> {
+  const rows = await db.delete(schema.aiReports).where(eq(schema.aiReports.id, id)).returning({ id: schema.aiReports.id });
+  return rows.length > 0;
+}
+
 // Always inserts a new row — a report is never updated in place, so
 // "Regenerate" is just another POST /api/reports and every past report
 // stays intact.

@@ -11,10 +11,12 @@
 // See /Users/anil.ghatan/.claude/plans/synchronous-churning-mango.md ("Data model")
 // for the source of truth this file implements.
 
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
   boolean,
+  check,
   integer,
   jsonb,
   pgTable,
@@ -83,6 +85,24 @@ export const prRecordProducts = pgTable(
   ],
 );
 
+export const productPrices = pgTable(
+  "product_prices",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    category: text("category").notNull(),
+    shade: text("shade").notNull(),
+    productName: text("product_name").notNull(),
+    unitPriceNpr: integer("unit_price_npr").notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("product_prices_category_shade_idx").on(table.category, table.shade),
+    check("product_prices_unit_price_positive_check", sql`${table.unitPriceNpr} > 0`),
+  ],
+);
+
 export const aiReports = pgTable("ai_reports", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -103,5 +123,7 @@ export type PrRecordRow = typeof prRecords.$inferSelect;
 export type NewPrRecordRow = typeof prRecords.$inferInsert;
 export type PrRecordProductRow = typeof prRecordProducts.$inferSelect;
 export type NewPrRecordProductRow = typeof prRecordProducts.$inferInsert;
+export type ProductPriceRow = typeof productPrices.$inferSelect;
+export type NewProductPriceRow = typeof productPrices.$inferInsert;
 export type AiReportRow = typeof aiReports.$inferSelect;
 export type NewAiReportRow = typeof aiReports.$inferInsert;

@@ -11,7 +11,7 @@ export type ProductLine = {
   quantity: number;
 };
 
-export type { PrValuation, PrValueLine } from "@/lib/pr-pricing";
+export type { ProductPrice, PrValuation, PrValueLine } from "@/lib/pr-pricing";
 
 export type PrRecord = {
   id: number;

@@ -9,8 +9,9 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
-import { calculatePrValue } from "@/lib/pr-pricing";
+import { calculatePrValue, makePriceLookup } from "@/lib/pr-pricing";
 import type { ProductLine } from "@/lib/types";
+import { listProductPrices } from "@/lib/product-prices";
 
 const { prRecords, prRecordProducts } = schema;
 
@@ -257,17 +258,21 @@ async function getPrValueBreakdown(): Promise<{
   perCategory: Map<string, ValueBucket>;
   perShade: Map<string, ValueBucket>;
 }> {
-  const rows = await db
-    .select({
-      recordId: prRecords.id,
-      fiscalYear: prRecords.fiscalYear,
-      category: prRecordProducts.category,
-      shade: prRecordProducts.shade,
-      quantity: prRecordProducts.quantity,
-    })
-    .from(prRecords)
-    .leftJoin(prRecordProducts, eq(prRecords.id, prRecordProducts.prRecordId))
-    .where(notTestOrDeleted);
+  const [rows, prices] = await Promise.all([
+    db
+      .select({
+        recordId: prRecords.id,
+        fiscalYear: prRecords.fiscalYear,
+        category: prRecordProducts.category,
+        shade: prRecordProducts.shade,
+        quantity: prRecordProducts.quantity,
+      })
+      .from(prRecords)
+      .leftJoin(prRecordProducts, eq(prRecords.id, prRecordProducts.prRecordId))
+      .where(notTestOrDeleted),
+    listProductPrices(),
+  ]);
+  const priceLookup = makePriceLookup(prices);
 
   const records = new Map<number, { fiscalYear: string; products: ProductLine[] }>();
   for (const row of rows) {
@@ -289,7 +294,7 @@ async function getPrValueBreakdown(): Promise<{
   };
 
   for (const record of records.values()) {
-    const valuation = calculatePrValue(record.products);
+    const valuation = calculatePrValue(record.products, priceLookup);
     if (valuation.complete) summary.valuedSends += 1;
     else {
       summary.incompleteSends += 1;

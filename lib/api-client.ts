@@ -2,6 +2,7 @@
 
 import type {
   MetaResponse,
+  ProductPrice,
   PrRecord,
   PrRecordInput,
   ReportDetail,
@@ -35,6 +36,36 @@ export async function fetchPrRecords(opts: { deleted?: boolean } = {}): Promise<
 
 export async function fetchMeta(): Promise<MetaResponse> {
   return handle<MetaResponse>(await fetch("/api/meta", { cache: "no-store" }));
+}
+
+export async function fetchProductPrices(): Promise<ProductPrice[]> {
+  const { prices } = await handle<{ prices: ProductPrice[] }>(await fetch("/api/product-prices", { cache: "no-store" }));
+  return prices;
+}
+
+export async function createProductPrice(input: Omit<ProductPrice, "id">): Promise<ProductPrice> {
+  const { price } = await handle<{ price: ProductPrice }>(
+    await fetch("/api/product-prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  );
+  return price;
+}
+
+export async function updateProductPrice(
+  id: number,
+  input: Pick<ProductPrice, "productName" | "unitPriceNpr">,
+): Promise<ProductPrice> {
+  const { price } = await handle<{ price: ProductPrice }>(
+    await fetch(`/api/product-prices/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  );
+  return price;
 }
 
 export async function createPrRecord(input: PrRecordInput): Promise<PrRecord> {
@@ -87,6 +118,10 @@ export async function fetchReports(): Promise<ReportSummary[]> {
 export async function fetchReport(id: number | string): Promise<ReportDetail> {
   const { report } = await handle<{ report: ReportDetail }>(await fetch(`/api/reports/${id}`));
   return report;
+}
+
+export async function deleteReport(id: number): Promise<void> {
+  await handle(await fetch(`/api/reports/${id}`, { method: "DELETE" }));
 }
 
 export async function generateReport(type: ReportType = "ai"): Promise<ReportDetail> {

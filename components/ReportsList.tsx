@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { fetchReports, generateReport } from "@/lib/api-client";
+import { deleteReport, fetchReports, generateReport } from "@/lib/api-client";
 import type { ReportSummary, ReportType } from "@/lib/types";
 
 function fmtGeneratedAt(iso: string): string {
@@ -12,13 +12,15 @@ function fmtGeneratedAt(iso: string): string {
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function ReportsList() {
+export default function ReportsList({ canDelete }: { canDelete: boolean }) {
   const router = useRouter();
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [reportType, setReportType] = useState<ReportType>("ai");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +46,20 @@ export default function ReportsList() {
     } catch (err) {
       setGenError(err instanceof Error ? err.message : "Failed to generate report");
       setGenerating(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!window.confirm("Delete this saved report? This cannot be undone.")) return;
+    setDeletingId(id);
+    setDeleteError(null);
+    try {
+      await deleteReport(id);
+      setReports((current) => current?.filter((report) => report.id !== id) ?? []);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete report");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -92,6 +108,12 @@ export default function ReportsList() {
         </div>
       )}
 
+      {deleteError && (
+        <div className="panel report-error" role="alert">
+          <strong>Couldn&apos;t delete report:</strong> {deleteError}
+        </div>
+      )}
+
       {loadError && (
         <div className="panel report-error">
           <strong>Couldn&apos;t load reports:</strong> {loadError}
@@ -114,20 +136,32 @@ export default function ReportsList() {
       {reports !== null && reports.length > 0 && (
         <div className="panel reports-list">
           {reports.map((r) => (
-            <a key={r.id} className="report-card" href={`/reports/${r.id}`}>
-              <div>
-                <div className="report-card-date">
-                  {fmtGeneratedAt(r.generatedAt)}{" "}
-                  <span className={`badge ${r.reportType === "ai" ? "ai" : "standard"}`}>
-                    {r.reportType === "ai" ? "AI" : "Standard"}
-                  </span>
+            <div key={r.id} className="report-card">
+              <a className="report-card-open" href={`/reports/${r.id}`}>
+                <div>
+                  <div className="report-card-date">
+                    {fmtGeneratedAt(r.generatedAt)}{" "}
+                    <span className={`badge ${r.reportType === "ai" ? "ai" : "standard"}`}>
+                      {r.reportType === "ai" ? "AI" : "Standard"}
+                    </span>
+                  </div>
+                  <div className="report-card-meta">
+                    Model: {r.model} · Status: {r.status}
+                  </div>
                 </div>
-                <div className="report-card-meta">
-                  Model: {r.model} · Status: {r.status}
-                </div>
-              </div>
-              <span className="report-card-link">View report →</span>
-            </a>
+                <span className="report-card-link">View report →</span>
+              </a>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="btn danger small report-delete"
+                  disabled={deletingId === r.id}
+                  onClick={() => handleDelete(r.id)}
+                >
+                  {deletingId === r.id ? "Deleting…" : "Delete"}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

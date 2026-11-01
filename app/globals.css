@@ -1554,6 +1554,13 @@ footer a {
     align-items: flex-start;
     gap: 6px;
   }
+  .report-card-open {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .report-delete {
+    align-self: flex-start;
+  }
   .login-theme-toggle {
     top: 12px;
     right: 12px;
@@ -1636,6 +1643,19 @@ footer a {
   text-decoration: none;
   color: inherit;
   transition: background 0.15s ease;
+}
+.report-card-open {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.report-delete {
+  flex-shrink: 0;
 }
 .report-card:hover {
   background: var(--primary-soft);

@@ -4,7 +4,8 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { PrRecord, PrRecordInput, ProductLine } from "@/lib/types";
-import { calculatePrValue } from "@/lib/pr-pricing";
+import { calculatePrValue, makePriceLookup, type PriceLookup } from "@/lib/pr-pricing";
+import { listProductPrices } from "@/lib/product-prices";
 
 type ProductInput = { category: string; shade: string; quantity: number };
 
@@ -21,6 +22,7 @@ function toIsoDateOnly(date: string): string {
 function rowToClient(
   row: typeof schema.prRecords.$inferSelect,
   products: ProductLine[],
+  prices: PriceLookup,
 ): PrRecord {
   return {
     id: row.id,
@@ -34,7 +36,7 @@ function rowToClient(
     notes: row.notes,
     totalQty: row.totalQty,
     products,
-    valuation: calculatePrValue(products),
+    valuation: calculatePrValue(products, prices),
     isDeleted: row.isDeleted,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -46,10 +48,10 @@ async function attachProducts(
 ): Promise<PrRecord[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const productRows = await db
-    .select()
-    .from(schema.prRecordProducts)
-    .where(inArray(schema.prRecordProducts.prRecordId, ids));
+  const [productRows, priceRows] = await Promise.all([
+    db.select().from(schema.prRecordProducts).where(inArray(schema.prRecordProducts.prRecordId, ids)),
+    listProductPrices(),
+  ]);
 
   const byRecord = new Map<number, ProductLine[]>();
   for (const p of productRows) {
@@ -58,7 +60,8 @@ async function attachProducts(
     byRecord.set(p.prRecordId, list);
   }
 
-  return rows.map((row) => rowToClient(row, byRecord.get(row.id) ?? []));
+  const prices = makePriceLookup(priceRows);
+  return rows.map((row) => rowToClient(row, byRecord.get(row.id) ?? [], prices));
 }
 
 export async function listPrRecords(opts: { deleted?: boolean } = {}): Promise<PrRecord[]> {
@@ -105,7 +108,7 @@ async function replaceProducts(
 }
 
 export async function createPrRecord(input: PrRecordInput, userId: string | undefined): Promise<PrRecord> {
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const totalQty = sumQty(input.products);
     const [row] = await tx
       .insert(schema.prRecords)
@@ -124,11 +127,11 @@ export async function createPrRecord(input: PrRecordInput, userId: string | unde
       })
       .returning();
     await replaceProducts(tx, row.id, input.products);
-    const products = input.products
-      .filter((p) => p.category && p.shade && Number(p.quantity) > 0)
-      .map((p) => ({ category: p.category, shade: p.shade, quantity: Number(p.quantity) }));
-    return rowToClient({ ...row, totalQty }, products);
+    return { id: row.id };
   });
+  const record = await getPrRecord(created.id);
+  if (!record) throw new Error("Created PR record could not be reloaded.");
+  return record;
 }
 
 export async function updatePrRecord(
@@ -136,7 +139,7 @@ export async function updatePrRecord(
   input: PrRecordInput,
   userId: string | undefined,
 ): Promise<PrRecord | null> {
-  return db.transaction(async (tx) => {
+  const updated = await db.transaction(async (tx) => {
     const totalQty = sumQty(input.products);
     const [row] = await tx
       .update(schema.prRecords)
@@ -157,11 +160,9 @@ export async function updatePrRecord(
       .returning();
     if (!row) return null;
     await replaceProducts(tx, id, input.products);
-    const products = input.products
-      .filter((p) => p.category && p.shade && Number(p.quantity) > 0)
-      .map((p) => ({ category: p.category, shade: p.shade, quantity: Number(p.quantity) }));
-    return rowToClient(row, products);
+    return row.id;
   });
+  return updated === null ? null : getPrRecord(updated);
 }
 
 export async function softDeletePrRecord(id: number, userId: string | undefined): Promise<boolean> {
@@ -196,15 +197,15 @@ export async function bulkCreatePrRecords(
 }
 
 export async function getMeta(): Promise<{ categories: string[]; shadesByCategory: Record<string, string[]> }> {
-  const rows = await db
-    .selectDistinct({
-      category: schema.prRecordProducts.category,
-      shade: schema.prRecordProducts.shade,
-    })
-    .from(schema.prRecordProducts);
+  const [rows, prices] = await Promise.all([
+    db
+      .selectDistinct({ category: schema.prRecordProducts.category, shade: schema.prRecordProducts.shade })
+      .from(schema.prRecordProducts),
+    db.select({ category: schema.productPrices.category, shade: schema.productPrices.shade }).from(schema.productPrices),
+  ]);
 
   const shadesByCategory: Record<string, string[]> = {};
-  for (const r of rows) {
+  for (const r of [...rows, ...prices]) {
     const list = shadesByCategory[r.category] ?? (shadesByCategory[r.category] = []);
     if (!list.includes(r.shade)) list.push(r.shade);
   }
